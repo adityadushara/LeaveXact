@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
 from typing import List
 import os
+import pytz
 
 class Settings(BaseSettings):
     # Database settings
@@ -18,14 +19,21 @@ class Settings(BaseSettings):
     APP_NAME: str = "LeaveXact API"
     DEBUG: bool = True
     
+    # Timezone settings
+    TIMEZONE: str = "Asia/Kolkata"  # Indian Standard Time (IST)
+    
     # Default leave balances
     DEFAULT_ANNUAL_LEAVE: int = 20
     DEFAULT_SICK_LEAVE: int = 10
     DEFAULT_PERSONAL_LEAVE: int = 5
     DEFAULT_EMERGENCY_LEAVE: int = 5
     DEFAULT_MATERNITY_LEAVE: int = 90
+    DEFAULT_PATERNITY_LEAVE: int = 15
     
     class Config:
         env_file = ".env"
 
 settings = Settings()
+
+# Get timezone object
+IST = pytz.timezone(settings.TIMEZONE)

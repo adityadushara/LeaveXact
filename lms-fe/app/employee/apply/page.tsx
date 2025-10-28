@@ -300,12 +300,12 @@ export default function ApplyLeavePage() {
                         <Button
                           variant="outline"
                           className={cn(
-                            "w-full justify-start text-left font-normal bg-gray-50 border-gray-300 h-11 hover:border-emerald-500 hover:bg-emerald-50 focus:border-emerald-500 focus:ring-0 focus:ring-offset-0 transition-colors",
+                            "w-full justify-start text-left font-normal bg-gray-50 border-gray-300 h-11 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 focus:border-emerald-500 focus:ring-0 focus:ring-offset-0 transition-all group",
                             !startDate && "text-gray-400",
                             errors.startDate && "border-red-500"
                           )}
                         >
-                          <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
+                          <CalendarIcon className="mr-2 h-4 w-4 text-gray-500 group-hover:text-emerald-600 transition-colors" />
                           {startDate ? format(startDate, "PPP") : "Pick a date"}
                         </Button>
                       </PopoverTrigger>
@@ -333,12 +333,12 @@ export default function ApplyLeavePage() {
                         <Button
                           variant="outline"
                           className={cn(
-                            "w-full justify-start text-left font-normal bg-gray-50 border-gray-300 h-11 hover:border-emerald-500 hover:bg-emerald-50 focus:border-emerald-500 focus:ring-0 focus:ring-offset-0 transition-colors",
+                            "w-full justify-start text-left font-normal bg-gray-50 border-gray-300 h-11 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 focus:border-emerald-500 focus:ring-0 focus:ring-offset-0 transition-all group",
                             !endDate && "text-gray-400",
                             errors.endDate && "border-red-500"
                           )}
                         >
-                          <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
+                          <CalendarIcon className="mr-2 h-4 w-4 text-gray-500 group-hover:text-emerald-600 transition-colors" />
                           {endDate ? format(endDate, "PPP") : "Pick a date"}
                         </Button>
                       </PopoverTrigger>

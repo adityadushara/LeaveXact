@@ -360,7 +360,10 @@ def update_leave_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(auth.get_current_user)
 ):
-    """Update leave request (only pending requests)."""
+    """Update leave request (only pending requests). Can update leave type, dates, and reason."""
+    import logging
+    logging.info(f"Update request received: {leave_update.dict(exclude_unset=True)}")
+    
     leave_request = crud.get_leave_request(db, request_id=request_id)
     if not leave_request:
         raise HTTPException(status_code=404, detail="Leave request not found")
@@ -373,18 +376,53 @@ def update_leave_request(
     if leave_request.status != LeaveStatus.PENDING:
         raise HTTPException(status_code=400, detail="Only pending requests can be updated")
     
+    # Get the employee (for balance checking)
+    employee = db.query(User).filter(User.id == leave_request.employee_id).first()
+    
+    # Determine the new leave type and dates
+    new_leave_type = leave_update.leave_type.value if leave_update.leave_type else leave_request.leave_type.value
+    new_start_date = leave_update.start_date if leave_update.start_date else leave_request.start_date
+    new_end_date = leave_update.end_date if leave_update.end_date else leave_request.end_date
+    
+    # Validate dates
+    if new_start_date > new_end_date:
+        raise HTTPException(status_code=400, detail="Start date must be before or equal to end date")
+    
+    # Calculate new duration
+    new_duration = (new_end_date - new_start_date).days + 1
+    
+    # Check leave balance for the new configuration
+    available_balance = getattr(employee, f"{new_leave_type}_leave", 0)
+    
+    if new_duration > available_balance:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Insufficient {new_leave_type} leave balance. Available: {available_balance} days, Requested: {new_duration} days"
+        )
+    
     # Update request
     db_leave_request = crud.update_leave_request(db, request_id=request_id, leave_update=leave_update)
     if not db_leave_request:
         raise HTTPException(status_code=400, detail="Could not update leave request")
     
     # Log the action
+    update_details = leave_update.dict(exclude_unset=True)
+    if leave_update.start_date:
+        update_details["start_date"] = leave_update.start_date.strftime("%Y-%m-%d")
+    if leave_update.end_date:
+        update_details["end_date"] = leave_update.end_date.strftime("%Y-%m-%d")
+    
     crud.create_audit_log(
         db=db,
         user_id=current_user.id,
         action="leave_updated",
         description=f"Updated leave request #{request_id}",
-        details={"leave_request_id": request_id, "updates": leave_update.dict(exclude_unset=True)}
+        details={
+            "leave_request_id": request_id,
+            "updates": update_details,
+            "old_duration": leave_request.duration,
+            "new_duration": new_duration
+        }
     )
     
     return db_leave_request
@@ -751,7 +789,7 @@ def get_all_employees_calendar(
 ):
     """
     Get leave calendar for all employees (Admin only).
-    Shows approved leaves from the calendar table.
+    Returns an array of days, each containing users on leave that day.
     """
     # Only admins can access this
     if current_user.role != "admin":
@@ -771,41 +809,106 @@ def get_all_employees_calendar(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
     
-    # Get calendar for all employees
-    employees_calendar = crud.get_all_employees_calendar(db, start_dt, end_dt)
+    # Get all approved leave calendar entries for the date range
+    from sqlalchemy.orm import joinedload
+    calendar_entries = db.query(LeaveCalendar).options(
+        joinedload(LeaveCalendar.employee),
+        joinedload(LeaveCalendar.leave_request)
+    ).join(LeaveRequest).filter(
+        LeaveCalendar.leave_date >= start_dt,
+        LeaveCalendar.leave_date <= end_dt,
+        LeaveRequest.status == LeaveStatus.APPROVED
+    ).order_by(LeaveCalendar.leave_date, LeaveCalendar.employee_id).all()
     
-    # Get all leave requests for this period to calculate durations
+    # Group by date
+    days_map = {}
+    for entry in calendar_entries:
+        date_str = entry.leave_date.strftime("%Y-%m-%d")
+        
+        if date_str not in days_map:
+            days_map[date_str] = []
+        
+        # Add user leave record for this day
+        leave_record = {
+            "user": {
+                "id": entry.employee.id,
+                "name": entry.employee.name,
+                "employee_id": entry.employee.employee_id,
+                "email": entry.employee.email,
+                "department": entry.employee.department,
+                "role": entry.employee.role.value
+            },
+            "leave": {
+                "id": entry.leave_request.id,
+                "leave_type": entry.leave_request.leave_type.value,
+                "start_date": entry.leave_request.start_date.strftime("%Y-%m-%d"),
+                "end_date": entry.leave_request.end_date.strftime("%Y-%m-%d"),
+                "duration": entry.leave_request.duration,
+                "reason": entry.leave_request.reason,
+                "status": entry.leave_request.status.value,
+                "admin_comment": entry.leave_request.admin_comment,
+                "created_at": entry.leave_request.created_at.isoformat() if entry.leave_request.created_at else None
+            }
+        }
+        
+        days_map[date_str].append(leave_record)
+    
+    # Convert to array format
+    days = []
+    current_date = start_dt
+    while current_date <= end_dt:
+        date_str = current_date.strftime("%Y-%m-%d")
+        
+        # Check if it's a holiday
+        holiday_info = None
+        if include_holidays:
+            for holiday in GUJARAT_HOLIDAYS:
+                if holiday["date"] == date_str:
+                    holiday_info = {
+                        "name": holiday["name"],
+                        "type": holiday["type"]
+                    }
+                    break
+        
+        day_data = {
+            "date": date_str,
+            "day_of_week": current_date.strftime("%A"),
+            "is_holiday": holiday_info is not None,
+            "holiday": holiday_info,
+            "leaves": days_map.get(date_str, []),
+            "leave_count": len(days_map.get(date_str, []))
+        }
+        
+        days.append(day_data)
+        current_date += timedelta(days=1)
+    
+    # Get statistics
     leave_requests = db.query(LeaveRequest).filter(
         LeaveRequest.start_date <= end_dt,
         LeaveRequest.end_date >= start_dt
     ).all()
     
-    # Calculate durations by status
     pending_duration = sum(req.duration for req in leave_requests if req.status == LeaveStatus.PENDING)
     approved_duration = sum(req.duration for req in leave_requests if req.status == LeaveStatus.APPROVED)
     rejected_duration = sum(req.duration for req in leave_requests if req.status == LeaveStatus.REJECTED)
     expired_duration = sum(req.duration for req in leave_requests if req.status == LeaveStatus.EXPIRED)
     
-    # Filter holidays within date range
-    holidays = []
-    if include_holidays:
-        for holiday in GUJARAT_HOLIDAYS:
-            holiday_date = datetime.strptime(holiday["date"], "%Y-%m-%d")
-            if start_dt <= holiday_date <= end_dt:
-                holidays.append(holiday)
-    
     return {
         "date_range": {
             "start_date": start_dt.strftime("%Y-%m-%d"),
-            "end_date": end_dt.strftime("%Y-%m-%d")
+            "end_date": end_dt.strftime("%Y-%m-%d"),
+            "total_days": (end_dt - start_dt).days + 1
         },
-        "employees": employees_calendar,
-        "public_holidays": holidays,
-        "leave_durations": {
-            "pending": pending_duration,
-            "approved": approved_duration,
-            "rejected": rejected_duration,
-            "expired": expired_duration,
-            "total_applied": pending_duration + approved_duration + rejected_duration + expired_duration
+        "days": days,
+        "statistics": {
+            "total_leave_days": sum(day["leave_count"] for day in days),
+            "days_with_leaves": sum(1 for day in days if day["leave_count"] > 0),
+            "leave_durations": {
+                "pending": pending_duration,
+                "approved": approved_duration,
+                "rejected": rejected_duration,
+                "expired": expired_duration,
+                "total_applied": pending_duration + approved_duration + rejected_duration + expired_duration
+            }
         }
     }

@@ -9,6 +9,7 @@ from app.config import settings
 from app.database import get_db
 from app.models import User, UserRole
 from app.schemas import TokenData
+from app.utils import get_current_time
 
 # Password hashing (use pbkdf2_sha256 to avoid bcrypt backend issues)
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
@@ -25,14 +26,17 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Create a JWT access token."""
+    """Create a JWT access token with IST timezone."""
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    current_time = get_current_time()
     
-    to_encode.update({"exp": expire})
+    if expires_delta:
+        expire = current_time + expires_delta
+    else:
+        expire = current_time + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    
+    # Convert to UTC timestamp for JWT (standard practice)
+    to_encode.update({"exp": expire.timestamp()})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 

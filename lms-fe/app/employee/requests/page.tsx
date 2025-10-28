@@ -72,6 +72,8 @@ export default function MyRequestsPage() {
   const [editEndDate, setEditEndDate] = useState<Date>()
   const [editReason, setEditReason] = useState("")
   const [isUpdating, setIsUpdating] = useState(false)
+  const [isStartDateOpen, setIsStartDateOpen] = useState(false)
+  const [isEndDateOpen, setIsEndDateOpen] = useState(false)
 
   // Delete dialog state
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -101,8 +103,8 @@ export default function MyRequestsPage() {
     filterRequests()
   }, [requests, searchQuery, statusFilter, typeFilter])
 
-  const fetchRequests = async () => {
-    if (hasFetched) return
+  const fetchRequests = async (force = false) => {
+    if (hasFetched && !force) return
 
     setIsLoading(true)
     setHasFetched(true)
@@ -270,6 +272,8 @@ export default function MyRequestsPage() {
     setEditStartDate(parseISO(request.startDate))
     setEditEndDate(parseISO(request.endDate))
     setEditReason(request.reason)
+    setIsStartDateOpen(false)
+    setIsEndDateOpen(false)
     setIsEditDialogOpen(true)
   }
 
@@ -308,8 +312,7 @@ export default function MyRequestsPage() {
       })
 
       setIsEditDialogOpen(false)
-      setHasFetched(false)
-      fetchRequests()
+      await fetchRequests(true) // Force refresh
     } catch (error: any) {
       addToast({
         title: "Error",
@@ -347,8 +350,7 @@ export default function MyRequestsPage() {
       })
 
       setIsDeleteDialogOpen(false)
-      setHasFetched(false)
-      fetchRequests()
+      await fetchRequests(true) // Force refresh
     } catch (error: any) {
       addToast({
         title: "Error",
@@ -783,7 +785,16 @@ export default function MyRequestsPage() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent 
+          className="max-w-2xl"
+          onInteractOutside={(e) => {
+            // Prevent dialog from closing when clicking on calendar popover
+            const target = e.target as HTMLElement
+            if (target.closest('[role="dialog"]') || target.closest('.rdp')) {
+              e.preventDefault()
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-slate-900">Edit Leave Request</DialogTitle>
             <DialogDescription className="text-sm text-slate-600">
@@ -816,12 +827,12 @@ export default function MyRequestsPage() {
                 <Label className="text-sm font-medium text-gray-600">
                   Start Date <span className="text-red-500">*</span>
                 </Label>
-                <Popover>
+                <Popover open={isStartDateOpen} onOpenChange={setIsStartDateOpen} modal={true}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       className={cn(
-                        "w-full justify-start text-left font-normal bg-gray-50 border-gray-300 h-11 hover:border-emerald-500 hover:bg-emerald-50 focus:border-emerald-500 focus:ring-0 focus:ring-offset-0 transition-colors",
+                        "w-full justify-start text-left font-normal bg-white border-gray-300 h-11 hover:border-emerald-500 hover:bg-gray-50 hover:text-gray-900 focus:border-emerald-500 focus:ring-0 focus:ring-offset-0 data-[state=open]:bg-white data-[state=open]:border-emerald-500 transition-colors",
                         !editStartDate && "text-gray-400"
                       )}
                     >
@@ -829,11 +840,14 @@ export default function MyRequestsPage() {
                       {editStartDate ? format(editStartDate, "PPP") : "Pick a date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
+                  <PopoverContent className="w-auto p-0 bg-white" align="start" side="bottom" sideOffset={4}>
                     <Calendar
                       mode="single"
                       selected={editStartDate}
-                      onSelect={setEditStartDate}
+                      onSelect={(date) => {
+                        setEditStartDate(date)
+                        setIsStartDateOpen(false)
+                      }}
                       disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                     />
                   </PopoverContent>
@@ -844,12 +858,12 @@ export default function MyRequestsPage() {
                 <Label className="text-sm font-medium text-gray-600">
                   End Date <span className="text-red-500">*</span>
                 </Label>
-                <Popover>
+                <Popover open={isEndDateOpen} onOpenChange={setIsEndDateOpen} modal={true}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       className={cn(
-                        "w-full justify-start text-left font-normal bg-gray-50 border-gray-300 h-11 hover:border-emerald-500 hover:bg-emerald-50 focus:border-emerald-500 focus:ring-0 focus:ring-offset-0 transition-colors",
+                        "w-full justify-start text-left font-normal bg-white border-gray-300 h-11 hover:border-emerald-500 hover:bg-gray-50 hover:text-gray-900 focus:border-emerald-500 focus:ring-0 focus:ring-offset-0 data-[state=open]:bg-white data-[state=open]:border-emerald-500 transition-colors",
                         !editEndDate && "text-gray-400"
                       )}
                     >
@@ -857,11 +871,14 @@ export default function MyRequestsPage() {
                       {editEndDate ? format(editEndDate, "PPP") : "Pick a date"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
+                  <PopoverContent className="w-auto p-0 bg-white" align="start" side="bottom" sideOffset={4}>
                     <Calendar
                       mode="single"
                       selected={editEndDate}
-                      onSelect={setEditEndDate}
+                      onSelect={(date) => {
+                        setEditEndDate(date)
+                        setIsEndDateOpen(false)
+                      }}
                       disabled={(date) =>
                         date < new Date(new Date().setHours(0, 0, 0, 0)) ||
                         (editStartDate ? date < editStartDate : false)

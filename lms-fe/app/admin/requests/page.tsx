@@ -142,6 +142,18 @@ export default function AllRequestsPage() {
             filtered = filtered.filter((request) => request.leaveType === leaveTypeFilter)
         }
 
+        // Sort: Pending first, then by applied date (newest first)
+        filtered = filtered.sort((a, b) => {
+            // Priority 1: Pending status comes first
+            if (a.status === 'pending' && b.status !== 'pending') return -1
+            if (a.status !== 'pending' && b.status === 'pending') return 1
+            
+            // Priority 2: Sort by applied date (newest first)
+            const dateA = new Date(getAppliedDate(a) || 0).getTime()
+            const dateB = new Date(getAppliedDate(b) || 0).getTime()
+            return dateB - dateA
+        })
+
         setFilteredRequests(filtered)
     }
 
@@ -154,7 +166,11 @@ export default function AllRequestsPage() {
     const handleStatusUpdate = async (requestId: string, status: "approved" | "rejected") => {
         setIsUpdating(true)
         try {
-            await leaveAPI.updateRequestStatus(requestId, status, adminComments)
+            if (status === "approved") {
+                await leaveAPI.approveRequest(requestId, adminComments)
+            } else {
+                await leaveAPI.rejectRequest(requestId, adminComments)
+            }
             toast({
                 title: "Request Updated",
                 description: `Leave request has been ${status}`,

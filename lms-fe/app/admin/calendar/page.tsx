@@ -13,7 +13,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
-import { leaveAPI } from "@/lib/api"
+import { adminAPI, holidaysAPI } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { CustomScrollbar } from "@/components/ui/custom-scrollbar"
 
@@ -70,6 +70,10 @@ export default function CalendarPage() {
     const [mounted, setMounted] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [selectedItem, setSelectedItem] = useState<any>(null)
+    const [selectedDay, setSelectedDay] = useState<any>(null)
+    const [todayEmployees, setTodayEmployees] = useState<any[]>([])
+    const [upcomingLeaves, setUpcomingLeaves] = useState<any[]>([])
+    const [upcomingHolidays, setUpcomingHolidays] = useState<any[]>([])
 
     useEffect(() => {
         if (!user) {
@@ -78,7 +82,60 @@ export default function CalendarPage() {
         }
         setMounted(true)
         fetchCalendar()
+        fetchTodayData()
     }, [currentDate])
+
+    const fetchTodayData = async () => {
+        try {
+            const today = new Date()
+            const todayStr = today.toISOString().split('T')[0]
+
+            // Fetch employees on leave today using the main calendar endpoint with single date
+            const todayData = await adminAPI.getCalendar({
+                date: todayStr
+            })
+
+            // Extract today's employees (response is an array with one day)
+            if (todayData && todayData.length > 0) {
+                setTodayEmployees(todayData[0].employees_on_leave || [])
+            } else {
+                setTodayEmployees([])
+            }
+
+            // Fetch upcoming leaves (next 7 days)
+            const nextWeek = new Date(today)
+            nextWeek.setDate(today.getDate() + 7)
+
+            const upcomingData = await adminAPI.getCalendar({
+                start_date: todayStr,
+                end_date: nextWeek.toISOString().split('T')[0],
+            })
+
+            // Extract unique upcoming leaves
+            const upcomingLeavesMap = new Map()
+            upcomingData.forEach((dayData: any) => {
+                dayData.employees_on_leave?.forEach((employee: any) => {
+                    const key = `${employee.employee_id}-${employee.leave_request_id}`
+                    if (!upcomingLeavesMap.has(key)) {
+                        upcomingLeavesMap.set(key, {
+                            ...employee,
+                            date: dayData.date
+                        })
+                    }
+                })
+            })
+            setUpcomingLeaves(Array.from(upcomingLeavesMap.values()).slice(0, 5))
+
+            // For holidays, we'll leave empty for now
+            setUpcomingHolidays([])
+        } catch (error) {
+            console.error("Failed to fetch today's data:", error)
+            // Set empty arrays on error to prevent UI issues
+            setTodayEmployees([])
+            setUpcomingLeaves([])
+            setUpcomingHolidays([])
+        }
+    }
 
     const fetchCalendar = async () => {
         if (!user) return
@@ -94,101 +151,87 @@ export default function CalendarPage() {
             const endDate = new Date(year, month + 1, 0)
 
             try {
-                // Fetch from my-calendar endpoint (no userId needed)
-                const calendarData = await leaveAPI.getCalendar(undefined, {
+                // Fetch from admin calendar endpoint
+                const calendarData = await adminAPI.getCalendar({
                     start_date: startDate.toISOString().split('T')[0],
                     end_date: endDate.toISOString().split('T')[0],
-                    include_holidays: true
                 })
 
-                // Transform all leaves into calendar format
-                const calendarLeaves: any[] = []
 
-                // Handle new backend response format with leave_durations
-                const leaveDurations = calendarData.leave_durations || {}
-                
-                // Process all leave types: approved, pending, rejected, expired
-                const leaveTypes = [
-                    { status: 'approved', leaves: leaveDurations.approved?.leaves || [] },
-                    { status: 'pending', leaves: leaveDurations.pending?.leaves || [] },
-                    { status: 'rejected', leaves: leaveDurations.rejected?.leaves || [] },
-                    { status: 'expired', leaves: leaveDurations.expired?.leaves || [] }
-                ]
 
-                leaveTypes.forEach(({ status, leaves }) => {
-                    leaves.forEach((leave: any) => {
-                        const leaveStartDate = new Date(leave.start_date)
-                        const leaveEndDate = new Date(leave.end_date)
-
-                        // Add each day in the range
-                        for (let d = new Date(leaveStartDate); d <= leaveEndDate; d.setDate(d.getDate() + 1)) {
-                            calendarLeaves.push({
-                                id: `${leave.id}-${d.toISOString().split('T')[0]}`,
-                                date: d.toISOString().split('T')[0],
-                                type: leave.leave_type,
-                                status: status,
-                                reason: leave.reason,
-                                duration: leave.duration || "Full Day",
-                                startDate: leave.start_date,
-                                endDate: leave.end_date,
-                                adminComment: leave.admin_comment,
-                                createdAt: leave.created_at
-                            })
-                        }
+                // Fetch holidays for the same date range
+                let holidaysData: any[] = []
+                try {
+                    holidaysData = await holidaysAPI.getHolidays({
+                        start_date: startDate.toISOString().split('T')[0],
+                        end_date: endDate.toISOString().split('T')[0],
                     })
+                } catch (holidayError) {
+                    console.error('Failed to fetch holidays:', holidayError)
+                    // Continue without holidays if fetch fails
+                    holidaysData = []
+                }
+
+                // Transform admin calendar response into calendar format
+                const calendarLeaves: any[] = []
+                const holidayData: any[] = []
+
+                // Process each day's data
+                calendarData.forEach((dayData: any, index: number) => {
+                    // Normalize date format to YYYY-MM-DD
+                    let date = dayData.date
+                    if (date && date.includes('T')) {
+                        date = date.split('T')[0]
+                    }
+
+                    // Process employees on leave for this day
+                    if (dayData.employees_on_leave && Array.isArray(dayData.employees_on_leave)) {
+                        dayData.employees_on_leave.forEach((employee: any) => {
+                            calendarLeaves.push({
+                                id: `${employee.leave_request_id}-${date}`,
+                                date: date,
+                                type: employee.leave_type,
+                                status: 'approved',
+                                reason: '', // Not provided in admin calendar response
+                                duration: employee.duration || "Full Day",
+                                startDate: employee.start_date,
+                                endDate: employee.end_date,
+                                employeeName: employee.employee_name,
+                                employeeCode: employee.employee_code,
+                                department: employee.department,
+                                leaveRequestId: employee.leave_request_id
+                            })
+                        })
+                    }
                 })
 
-                // Add holidays from public_holidays array
-                const holidayData = calendarData.public_holidays?.map((holiday: any) => ({
-                    id: `holiday-${holiday.date}`,
-                    date: holiday.date,
-                    type: 'holiday',
-                    status: 'holiday',
-                    reason: holiday.name,
-                    duration: "Full Day",
-                    name: holiday.name,
-                })) || []
+
+
+                // Process holidays
+                if (holidaysData && Array.isArray(holidaysData)) {
+                    holidaysData.forEach((holiday: any) => {
+                        // Normalize date format to YYYY-MM-DD
+                        let date = holiday.date
+                        if (date && date.includes('T')) {
+                            date = date.split('T')[0]
+                        }
+                        holidayData.push({
+                            id: `holiday-${date}`,
+                            date: date,
+                            name: holiday.name,
+                            type: holiday.type,
+                            status: 'holiday'
+                        })
+                    })
+                }
 
                 setLeaves(calendarLeaves)
                 setHolidays(holidayData)
             } catch (calendarError) {
-                console.warn("Calendar endpoint not available, falling back to regular requests:", calendarError)
-
-                try {
-                    // Fallback: Use regular requests endpoint
-                    const requests = await leaveAPI.getMyRequests()
-
-                    // Filter for approved requests in current month
-                    const calendarLeaves: any[] = []
-                    requests.forEach((request: any) => {
-                        if (request.status !== 'approved') return
-
-                        const requestStartDate = new Date(request.startDate)
-                        const requestEndDate = new Date(request.endDate)
-
-                        // Add each day in the range
-                        for (let d = new Date(requestStartDate); d <= requestEndDate; d.setDate(d.getDate() + 1)) {
-                            calendarLeaves.push({
-                                id: `${request.id}-${d.toISOString().split('T')[0]}`,
-                                date: d.toISOString().split('T')[0],
-                                type: request.leaveType || request.type,
-                                status: 'approved',
-                                reason: request.reason,
-                                duration: "Full Day",
-                                startDate: request.startDate,
-                                endDate: request.endDate,
-                            })
-                        }
-                    })
-
-                    setLeaves(calendarLeaves)
-                    setHolidays([]) // No holidays in fallback mode
-                } catch (fallbackError) {
-                    console.error("Fallback endpoint also failed:", fallbackError)
-                    // Set empty data if both endpoints fail
-                    setLeaves([])
-                    setHolidays([])
-                }
+                console.error("Failed to fetch admin calendar:", calendarError)
+                setLeaves([])
+                setHolidays([])
+                throw calendarError
             }
         } catch (error: any) {
             console.error("Failed to fetch calendar:", error)
@@ -253,7 +296,7 @@ export default function CalendarPage() {
             {/* Header */}
             <div className="mb-6">
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">Calendar</h1>
-                <p className="text-base text-gray-500">View your leave schedule and public holidays</p>
+                <p className="text-base text-gray-500">View employees on leave and public holidays</p>
             </div>
 
             <div className="flex-1 flex flex-col w-full">
@@ -325,19 +368,7 @@ export default function CalendarPage() {
                             <div className="flex items-center gap-4">
                                 <div className="flex items-center gap-1.5">
                                     <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                                    <span className="text-xs text-gray-500">Approved</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-                                    <span className="text-xs text-gray-500">Pending</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                                    <span className="text-xs text-gray-500">Rejected</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <div className="w-2 h-2 rounded-full bg-gray-500"></div>
-                                    <span className="text-xs text-gray-500">Expired</span>
+                                    <span className="text-xs text-gray-500">On Leave</span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                     <div className="w-2 h-2 rounded-full bg-blue-500"></div>
@@ -368,9 +399,16 @@ export default function CalendarPage() {
                                 const day = index + 1
                                 const items = getItemsForDate(day)
                                 const today = new Date()
+                                today.setHours(0, 0, 0, 0) // Reset time for accurate comparison
+
+                                const currentDayDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day)
+                                currentDayDate.setHours(0, 0, 0, 0)
+
                                 const isToday = day === today.getDate() &&
                                     currentDate.getMonth() === today.getMonth() &&
                                     currentDate.getFullYear() === today.getFullYear()
+
+                                const isFutureDate = currentDayDate > today
 
                                 const dayOfWeek = new Date(currentDate.getFullYear(), currentDate.getMonth(), day).getDay()
                                 const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
@@ -395,33 +433,46 @@ export default function CalendarPage() {
                                             </span>
                                         </div>
 
-                                        {/* Display all items (holidays and leaves) - bottom aligned with max 5 items height */}
+                                        {/* Display summary badge - bottom aligned */}
                                         {items.length > 0 && (
-                                            <CustomScrollbar maxHeight="110px" className="mt-auto">
-                                                <div className="flex flex-col gap-1 text-left">
-                                                {items.map((item, idx) => (
-                                                    <button
-                                                        key={`${item.id}-${idx}`}
-                                                        onClick={() => setSelectedItem(item)}
-                                                        className={`text-xs font-medium leading-snug px-2 py-1 rounded text-left transition-all hover:scale-105 hover:shadow-md cursor-pointer flex-shrink-0 truncate ${item.status === 'holiday'
-                                                            ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                                                            : item.status === 'pending'
-                                                                ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
-                                                                : item.status === 'rejected'
-                                                                    ? "bg-red-100 text-red-700 hover:bg-red-200"
-                                                                    : item.status === 'expired'
-                                                                        ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                                                        : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                                                            }`}
-                                                    >
-                                                        {item.status === 'holiday'
-                                                            ? item.name
-                                                            : item.status.charAt(0).toUpperCase() + item.status.slice(1)
-                                                        }
-                                                    </button>
-                                                ))}
-                                                </div>
-                                            </CustomScrollbar>
+                                            <div className="mt-auto">
+                                                {/* Count employees on leave (excluding holidays) */}
+                                                {(() => {
+                                                    const leaveCount = items.filter(item => item.status !== 'holiday').length
+                                                    const hasHoliday = items.some(item => item.status === 'holiday')
+
+                                                    return (
+                                                        <div className="flex flex-col gap-1">
+                                                            {leaveCount > 0 && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                                                                        setSelectedDay({
+                                                                            date: dateStr,
+                                                                            employees: items.filter(item => item.status !== 'holiday'),
+                                                                            holiday: items.find(item => item.status === 'holiday')
+                                                                        })
+                                                                    }}
+                                                                    className="text-xs font-medium leading-snug px-2 py-1 rounded text-left transition-all hover:scale-105 hover:shadow-md cursor-pointer bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                                                                >
+                                                                    {leaveCount} on leave
+                                                                </button>
+                                                            )}
+                                                            {hasHoliday && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const holiday = items.find(item => item.status === 'holiday')
+                                                                        setSelectedItem(holiday)
+                                                                    }}
+                                                                    className="text-xs font-medium leading-snug px-2 py-1 rounded text-left transition-all hover:scale-105 hover:shadow-md cursor-pointer bg-blue-100 text-blue-700 hover:bg-blue-200 truncate"
+                                                                >
+                                                                    {items.find(item => item.status === 'holiday')?.name || 'Holiday'}
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )
+                                                })()}
+                                            </div>
                                         )}
                                     </div>
                                 )
@@ -430,6 +481,86 @@ export default function CalendarPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Day Details Dialog - Shows list of employees on leave */}
+            <Dialog open={!!selectedDay} onOpenChange={() => setSelectedDay(null)}>
+                <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-hidden flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-semibold text-gray-900">
+                            {selectedDay?.employees?.length || 0} on leave
+                        </DialogTitle>
+                        {selectedDay?.date && (
+                            <p className="text-sm text-gray-500 mt-1">
+                                {new Date(selectedDay.date).toLocaleDateString('en-US', {
+                                    weekday: 'long',
+                                    month: 'long',
+                                    day: 'numeric',
+                                    year: 'numeric'
+                                })}
+                            </p>
+                        )}
+                    </DialogHeader>
+                    <div className="flex-1 overflow-y-auto py-4">
+                        <div className="space-y-3">
+                            {selectedDay?.employees?.map((employee: any, idx: number) => (
+                                <div key={idx} className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                    <div className="flex items-start gap-3">
+                                        {/* Avatar placeholder */}
+                                        <div className="h-12 w-12 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                                            <span className="text-emerald-700 font-semibold text-sm">
+                                                {employee.employeeName?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'NA'}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex-1 min-w-0">
+                                            {/* Employee name and type */}
+                                            <div className="flex items-start justify-between gap-2 mb-1">
+                                                <div>
+                                                    <h4 className="font-semibold text-gray-900">{employee.employeeName || 'Employee'}</h4>
+                                                    {employee.employeeCode && (
+                                                        <p className="text-xs text-gray-500">{employee.employeeCode}</p>
+                                                    )}
+                                                </div>
+                                                <span className={`text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap ${employee.type === 'sick' ? 'bg-blue-100 text-blue-700' :
+                                                    employee.type === 'annual' ? 'bg-emerald-100 text-emerald-700' :
+                                                        employee.type === 'personal' ? 'bg-purple-100 text-purple-700' :
+                                                            'bg-gray-100 text-gray-700'
+                                                    }`}>
+                                                    {employee.type?.charAt(0).toUpperCase() + employee.type?.slice(1) || 'Leave'}
+                                                </span>
+                                            </div>
+
+                                            {/* Department */}
+                                            {employee.department && (
+                                                <p className="text-sm text-gray-600 mb-2">{employee.department}</p>
+                                            )}
+
+                                            {/* Reason */}
+                                            {employee.reason && (
+                                                <p className="text-sm text-gray-700 italic mb-2">"{employee.reason}"</p>
+                                            )}
+
+                                            {/* Duration */}
+                                            {employee.startDate && employee.endDate && (
+                                                <div className="flex items-center gap-1 text-xs text-gray-500">
+                                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                    </svg>
+                                                    <span>
+                                                        {new Date(employee.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                        {' - '}
+                                                        {new Date(employee.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             {/* Leave/Holiday Details Dialog */}
             <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
@@ -469,18 +600,26 @@ export default function CalendarPage() {
                             ) : (
                                 <>
                                     <div>
+                                        <label className="text-sm font-medium text-gray-500">Employee</label>
+                                        <p className="text-base font-medium text-gray-900 mt-1">
+                                            {selectedItem.employeeName || 'Employee'}
+                                            {selectedItem.employeeCode && (
+                                                <span className="text-sm text-gray-500 ml-2">({selectedItem.employeeCode})</span>
+                                            )}
+                                        </p>
+                                    </div>
+                                    {selectedItem.department && (
+                                        <div>
+                                            <label className="text-sm font-medium text-gray-500">Department</label>
+                                            <p className="text-base font-medium text-gray-900 mt-1">
+                                                {selectedItem.department}
+                                            </p>
+                                        </div>
+                                    )}
+                                    <div>
                                         <label className="text-sm font-medium text-gray-500">Leave Type</label>
                                         <p className="text-base font-medium text-gray-900 mt-1 capitalize">
                                             {selectedItem.type || 'N/A'}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium text-gray-500">Status</label>
-                                        <p className={`text-base font-medium mt-1 capitalize ${selectedItem.status === 'approved' ? 'text-emerald-600' :
-                                                selectedItem.status === 'pending' ? 'text-amber-600' :
-                                                    'text-red-600'
-                                            }`}>
-                                            {selectedItem.status}
                                         </p>
                                     </div>
                                     {selectedItem.startDate && selectedItem.endDate && (
@@ -497,26 +636,6 @@ export default function CalendarPage() {
                                         <div>
                                             <label className="text-sm font-medium text-gray-500">Reason</label>
                                             <p className="text-base text-gray-900 mt-1">{selectedItem.reason}</p>
-                                        </div>
-                                    )}
-                                    {selectedItem.adminComment && (
-                                        <div>
-                                            <label className="text-sm font-medium text-gray-500">Admin Comment</label>
-                                            <p className="text-base text-gray-900 mt-1">{selectedItem.adminComment}</p>
-                                        </div>
-                                    )}
-                                    {selectedItem.createdAt && (
-                                        <div>
-                                            <label className="text-sm font-medium text-gray-500">Applied On</label>
-                                            <p className="text-base text-gray-900 mt-1">
-                                                {new Date(selectedItem.createdAt).toLocaleDateString('en-US', {
-                                                    month: 'short',
-                                                    day: 'numeric',
-                                                    year: 'numeric',
-                                                    hour: '2-digit',
-                                                    minute: '2-digit'
-                                                })}
-                                            </p>
                                         </div>
                                     )}
                                 </>

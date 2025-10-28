@@ -61,6 +61,11 @@ export function Sidebar({ className }: SidebarProps) {
       href: "/admin/employees",
     },
     {
+      label: "Calendar",
+      icon: Calendar,
+      href: "/admin/calendar",
+    },
+    {
       label: "Audit Logs",
       icon: Shield,
       href: "/admin/audit-logs",
@@ -163,7 +168,7 @@ export function Sidebar({ className }: SidebarProps) {
           <DropdownMenuContent align="end" className="w-56 mb-2">
             <DropdownMenuItem
               onClick={() => router.push(user?.role === "admin" ? "/admin/profile" : "/employee/profile")}
-              className="cursor-pointer hover:bg-emerald-50 focus:bg-emerald-50 hover:text-emerald-700 focus:text-emerald-700"
+              className="cursor-pointer hover:!bg-gray-100 focus:!bg-gray-100 hover:!text-gray-900 focus:!text-gray-900 focus-visible:!ring-0 focus-visible:!ring-offset-0"
             >
               <UserIcon className="h-4 w-4 mr-2" />
               My Profile
@@ -174,7 +179,7 @@ export function Sidebar({ className }: SidebarProps) {
                 logout()
                 router.push("/login")
               }}
-              className="cursor-pointer text-red-600 hover:bg-red-50 focus:bg-red-50 hover:text-red-700 focus:text-red-700"
+              className="cursor-pointer text-red-600 hover:!bg-red-50 focus:!bg-red-50 hover:!text-red-700 focus:!text-red-700 focus-visible:!ring-0 focus-visible:!ring-offset-0"
             >
               <LogOut className="h-4 w-4 mr-2" />
               Logout

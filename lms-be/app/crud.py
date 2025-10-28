@@ -5,6 +5,7 @@ from app.models import User, LeaveRequest, AuditLog, LeaveStatus, LeaveType, Lea
 from app.schemas import UserCreate, UserUpdate, LeaveRequestCreate, LeaveRequestUpdate
 from app.auth import get_password_hash
 from datetime import datetime, timedelta
+from app.utils import get_current_time
 import json
 
 # User CRUD operations
@@ -416,7 +417,7 @@ def remove_leave_calendar_entries(db: Session, leave_request_id: int) -> None:
 
 def expire_old_pending_leaves(db: Session) -> int:
     """Mark pending leave requests as expired if their end date has passed."""
-    current_date = datetime.now()
+    current_date = get_current_time().replace(hour=0, minute=0, second=0, microsecond=0)
     
     # Find all pending leave requests where end_date has passed
     expired_requests = db.query(LeaveRequest).filter(
@@ -449,3 +450,98 @@ def expire_old_pending_leaves(db: Session) -> int:
         db.commit()
     
     return count
+
+def get_employees_on_leave_by_date(db: Session, target_date: datetime) -> List[dict]:
+    """Get all employees on leave for a specific date."""
+    # Query approved leave requests that include the target date
+    leave_requests = db.query(LeaveRequest).options(
+        joinedload(LeaveRequest.employee)
+    ).filter(
+        LeaveRequest.status == LeaveStatus.APPROVED,
+        LeaveRequest.start_date <= target_date,
+        LeaveRequest.end_date >= target_date
+    ).all()
+    
+    employees_on_leave = []
+    for leave in leave_requests:
+        employees_on_leave.append({
+            "employee_id": leave.employee.id,
+            "employee_name": leave.employee.name,
+            "employee_code": leave.employee.employee_id,
+            "department": leave.employee.department,
+            "leave_type": leave.leave_type,
+            "leave_request_id": leave.id,
+            "start_date": leave.start_date,
+            "end_date": leave.end_date,
+            "duration": leave.duration
+        })
+    
+    return employees_on_leave
+
+def get_employees_on_leave_by_date_range(db: Session, start_date: datetime, end_date: datetime) -> dict:
+    """Get all employees on leave grouped by date for a date range."""
+    # Query approved leave requests that overlap with the date range
+    leave_requests = db.query(LeaveRequest).options(
+        joinedload(LeaveRequest.employee)
+    ).filter(
+        LeaveRequest.status == LeaveStatus.APPROVED,
+        LeaveRequest.start_date <= end_date,
+        LeaveRequest.end_date >= start_date
+    ).all()
+    
+    # Group by date
+    calendar_data = {}
+    current_date = start_date
+    
+    while current_date <= end_date:
+        date_str = current_date.strftime("%Y-%m-%d")
+        calendar_data[date_str] = []
+        
+        for leave in leave_requests:
+            # Check if this leave includes the current date
+            if leave.start_date <= current_date <= leave.end_date:
+                calendar_data[date_str].append({
+                    "employee_id": leave.employee.id,
+                    "employee_name": leave.employee.name,
+                    "employee_code": leave.employee.employee_id,
+                    "department": leave.employee.department,
+                    "leave_type": leave.leave_type,
+                    "leave_request_id": leave.id,
+                    "start_date": leave.start_date,
+                    "end_date": leave.end_date,
+                    "duration": leave.duration
+                })
+        
+        current_date += timedelta(days=1)
+    
+    return calendar_data
+
+def get_upcoming_leaves(db: Session, days: int = 30) -> List[dict]:
+    """Get all upcoming approved leaves starting from today."""
+    today = get_current_time().replace(hour=0, minute=0, second=0, microsecond=0)
+    end_date = today + timedelta(days=days)
+    
+    leave_requests = db.query(LeaveRequest).options(
+        joinedload(LeaveRequest.employee)
+    ).filter(
+        LeaveRequest.status == LeaveStatus.APPROVED,
+        LeaveRequest.start_date >= today,
+        LeaveRequest.start_date <= end_date
+    ).order_by(LeaveRequest.start_date).all()
+    
+    upcoming_leaves = []
+    for leave in leave_requests:
+        upcoming_leaves.append({
+            "employee_id": leave.employee.id,
+            "employee_name": leave.employee.name,
+            "employee_code": leave.employee.employee_id,
+            "department": leave.employee.department,
+            "leave_type": leave.leave_type,
+            "leave_request_id": leave.id,
+            "start_date": leave.start_date,
+            "end_date": leave.end_date,
+            "duration": leave.duration,
+            "reason": leave.reason
+        })
+    
+    return upcoming_leaves

@@ -8,7 +8,7 @@ export async function GET(
   try {
     const authHeader = getAuthHeader(request);
     
-    const response = await proxyRequest(`/api/leave/${params.id}`, {
+    const response = await proxyRequest(`/api/leaves/${params.id}`, {
       method: 'GET',
       headers: authHeader ? { 'Authorization': authHeader } : {},
     });
@@ -33,7 +33,7 @@ export async function PUT(
     const authHeader = getAuthHeader(request);
     const body = await request.json();
     
-    const response = await proxyRequest(`/api/leave/${params.id}`, {
+    const response = await proxyRequest(`/api/leaves/${params.id}`, {
       method: 'PUT',
       headers: authHeader ? { 'Authorization': authHeader } : {},
       body: JSON.stringify(body),
@@ -58,7 +58,7 @@ export async function DELETE(
   try {
     const authHeader = getAuthHeader(request);
     
-    const response = await proxyRequest(`/api/leave/${params.id}`, {
+    const response = await proxyRequest(`/api/leaves/${params.id}`, {
       method: 'DELETE',
       headers: authHeader ? { 'Authorization': authHeader } : {},
     });

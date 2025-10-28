@@ -1,6 +1,6 @@
 from pydantic import BaseModel, validator, EmailStr
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date
 from app.models import UserRole, LeaveType, LeaveStatus, Gender
 
 # Base schemas
@@ -161,6 +161,15 @@ class LeaveRequestUpdate(BaseModel):
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     reason: Optional[str] = None
+    
+    @validator('start_date', 'end_date', pre=True)
+    def parse_date(cls, v):
+        if v is None:
+            return v
+        if isinstance(v, str):
+            from dateutil import parser
+            return parser.parse(v)
+        return v
 
 class LeaveRequestResponse(LeaveRequestBase):
     id: int
@@ -249,3 +258,40 @@ class CalendarDayResponse(BaseModel):
     has_leave: bool
     leave_type: Optional[LeaveType] = None
     leave_request_id: Optional[int] = None
+
+# Admin Calendar schemas
+class EmployeeOnLeave(BaseModel):
+    employee_id: int
+    employee_name: str
+    employee_code: str
+    department: str
+    leave_type: LeaveType
+    leave_request_id: int
+    start_date: datetime
+    end_date: datetime
+    duration: int
+    
+    class Config:
+        from_attributes = True
+
+class AdminCalendarResponse(BaseModel):
+    date: str
+    employees_on_leave: List[EmployeeOnLeave]
+    total_employees_on_leave: int
+
+class UpcomingLeaveResponse(BaseModel):
+    employee_id: int
+    employee_name: str
+    employee_code: str
+    department: str
+    leave_type: LeaveType
+    leave_request_id: int
+    start_date: datetime
+    end_date: datetime
+    duration: int
+    reason: str
+
+class HolidayResponse(BaseModel):
+    date: str
+    name: str
+    type: str  # national, state, religious
