@@ -8,18 +8,45 @@ LeaveXact is a comprehensive leave management system built with FastAPI and SQLA
 
 ## Features
 
-- User authentication with JWT tokens
-- Role-based access control (Admin & Employee)
-- Leave request management (Create, Read, Update, Delete)
-- Multiple leave types (Annual, Sick, Personal, Emergency, Maternity, Paternity)
-- Leave approval/rejection workflow
-- Leave balance tracking
-- Leave calendar with Gujarat public holidays (2020-2030)
-- Audit logging for all actions
-- Analytics and reporting
-- Gender-based leave allocation (Maternity/Paternity)
-- Automatic expiration of old pending requests
-- Department-wise employee management
+### Core Functionality
+- **Authentication & Authorization**
+  - JWT-based authentication with secure token management
+  - Role-based access control (Admin & Employee)
+  - Password change and email update functionality
+  - Profile management for all users
+
+- **Leave Management**
+  - Submit, update, and delete leave requests
+  - Multiple leave types: Annual, Sick, Personal, Emergency, Maternity, Paternity
+  - Real-time leave balance tracking
+  - Automatic leave balance deduction on approval
+  - Gender-based leave allocation (Maternity for females, Paternity for males)
+  - Automatic expiration of old pending requests
+
+- **Admin Operations**
+  - Employee management (CRUD operations)
+  - Leave approval/rejection workflow with comments
+  - Department-wise employee filtering
+  - Admin calendar showing all employees on leave
+  - Bulk operations and analytics
+
+- **Calendar & Holidays**
+  - Personal leave calendar for employees
+  - Admin calendar showing team availability
+  - Gujarat public holidays (2020-2030) integration
+  - Date range filtering and holiday inclusion
+
+- **Analytics & Reporting**
+  - System-wide statistics and summaries
+  - Employee-specific analytics (approval rates, balances)
+  - Department-wise analytics
+  - Leave duration tracking by status
+
+- **Audit & Compliance**
+  - Comprehensive audit logging for all actions
+  - Searchable and filterable audit logs
+  - User activity tracking
+  - Detailed action history
 
 ## Technology Stack
 
@@ -128,16 +155,23 @@ Access the application:
 
 ## Cloud Deployment
 
-For detailed deployment instructions to Render, Railway, Fly.io, Heroku, or other platforms, see [DEPLOYMENT.md](DEPLOYMENT.md).
+### Supported Platforms
+- Render
+- Railway
+- Fly.io
+- Heroku
+- AWS / GCP / Azure
 
 ### Quick Deploy to Render
 
 1. Push code to GitHub
 2. Connect repository to Render
-3. Render auto-detects `render.yaml` and deploys
+3. Render auto-detects configuration and deploys
 4. Add environment variables in Render dashboard
 
 **Important:** Ensure Python 3.11 is used (not 3.13) to avoid build issues.
+
+For detailed deployment instructions, see deployment documentation or contact your DevOps team.
 
 ## Configuration
 
@@ -168,15 +202,21 @@ After running `seed_starter_data.py`:
 
 ## API Endpoints
 
-See [APIDOC.md](APIDOC.md) for complete API documentation.
+See [API_DOCUMENTATION.md](API_DOCUMENTATION.md) for complete API documentation with request/response examples.
 
 Main endpoint groups:
-- `/api/auth/*` - Authentication & user profile
-- `/api/employees/*` - Employee management (Admin)
-- `/api/leave/*` - Leave request operations
-- `/api/admin/*` - Admin operations
-- `/api/analytics/*` - Analytics & reporting
-- `/api/logs/*` - Audit logs
+- `/api/auth/*` - Authentication & user profile management
+- `/api/employees/*` - Employee management (Admin only)
+- `/api/leave/*` - Leave request operations & calendar
+- `/api/admin/*` - Admin operations & approvals
+- `/api/analytics/*` - Analytics & reporting (Admin only)
+- `/api/logs/*` - Audit logs (Admin only)
+- `/api/holidays` - Public holidays for Gujarat
+
+**Quick Links:**
+- Interactive API Docs: http://localhost:8000/docs
+- Alternative Docs: http://localhost:8000/redoc
+- Health Check: http://localhost:8000/health
 
 ## Leave Types
 
@@ -277,11 +317,34 @@ python check_admin_role.py
 
 ## Testing
 
-Use the interactive API documentation at `/docs` to test endpoints:
-1. Login to get access token
-2. Click "Authorize" button
-3. Enter: `Bearer <your-token>`
-4. Test any endpoint
+### Using Interactive API Docs
+
+1. Navigate to http://localhost:8000/docs
+2. Click on `/api/auth/login` endpoint
+3. Click "Try it out" and enter credentials
+4. Execute to get your JWT token
+5. Click the "Authorize" button at the top
+6. Enter: `Bearer <your-token>`
+7. Now you can test any endpoint
+
+### Using cURL
+
+```bash
+# Login
+curl -X POST "http://localhost:8000/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@leavexact.com","password":"Admin123!"}'
+
+# Use the token
+curl -X GET "http://localhost:8000/api/auth/me" \
+  -H "Authorization: Bearer <your-token>"
+```
+
+### Using Postman
+
+1. Import the API endpoints from `/docs` (OpenAPI spec)
+2. Set up environment variables for base URL and token
+3. Use collection runner for automated testing
 
 ## Audit Logging
 
@@ -302,13 +365,25 @@ Available analytics endpoints:
 - Employee analytics (approval rates, balances)
 - Department analytics (team statistics)
 
+## API Documentation
+
+Complete API documentation with examples is available in [API_DOCUMENTATION.md](API_DOCUMENTATION.md).
+
+The documentation includes:
+- All available endpoints with request/response examples
+- Authentication flow and token management
+- Query parameters and filtering options
+- Error codes and handling
+- Common use cases and workflows
+
 ## Support
 
 For issues, questions, or contributions:
-1. Check the API documentation at `/docs`
-2. Review the [APIDOC.md](APIDOC.md) file
-3. Check application logs
-4. Contact system administrator
+1. Check the interactive API documentation at `/docs`
+2. Review the [API_DOCUMENTATION.md](API_DOCUMENTATION.md) file
+3. Check application logs for errors
+4. Review audit logs for user actions
+5. Contact system administrator
 
 ## Version
 
