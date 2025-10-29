@@ -395,23 +395,23 @@ export default function CalendarPage() {
                                             </span>
                                         </div>
 
-                                        {/* Display all items (holidays and leaves) - bottom aligned with max 5 items height */}
+                                        {/* Display all items (holidays and leaves) - bottom aligned */}
                                         {items.length > 0 && (
-                                            <CustomScrollbar maxHeight="110px" className="mt-auto">
-                                                <div className="flex flex-col gap-1 text-left">
+                                            <div className="mt-auto">
+                                                <div className="flex flex-col gap-1">
                                                     {items.map((item, idx) => (
                                                         <button
                                                             key={`${item.id}-${idx}`}
                                                             onClick={() => setSelectedItem(item)}
-                                                            className={`text-xs font-medium leading-snug px-2 py-1 rounded text-left transition-all hover:scale-105 hover:shadow-md cursor-pointer flex-shrink-0 truncate ${item.status === 'holiday'
-                                                                ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                                                                : item.status === 'pending'
-                                                                    ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
-                                                                    : item.status === 'rejected'
-                                                                        ? "bg-red-100 text-red-700 hover:bg-red-200"
-                                                                        : item.status === 'expired'
-                                                                            ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                                                            : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                                                            className={`text-xs font-medium leading-snug px-2 py-1 rounded text-left transition-all hover:scale-105 hover:shadow-md cursor-pointer ${item.status === 'holiday'
+                                                                    ? "bg-blue-100 text-blue-700 hover:bg-blue-200 truncate"
+                                                                    : item.status === 'pending'
+                                                                        ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                                                                        : item.status === 'rejected'
+                                                                            ? "bg-red-100 text-red-700 hover:bg-red-200"
+                                                                            : item.status === 'expired'
+                                                                                ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                                                                : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
                                                                 }`}
                                                         >
                                                             {item.status === 'holiday'
@@ -421,7 +421,7 @@ export default function CalendarPage() {
                                                         </button>
                                                     ))}
                                                 </div>
-                                            </CustomScrollbar>
+                                            </div>
                                         )}
                                     </div>
                                 )
