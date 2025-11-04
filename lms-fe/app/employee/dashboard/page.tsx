@@ -77,9 +77,19 @@ export default function EmployeeDashboard() {
 
   // Helper function to get the leave type from a request (handles both leaveType and type)
   const getLeaveType = (request: any) => {
-    const type = request.leaveType || request.type
-    // Capitalize first letter
-    return type ? type.charAt(0).toUpperCase() + type.slice(1) : type
+    return request.leaveType || request.type || "unknown"
+  }
+
+  const getLeaveTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      annual: "Annual Leave",
+      sick: "Sick Leave",
+      personal: "Personal Leave",
+      emergency: "Emergency Leave",
+      maternity: "Maternity Leave",
+      paternity: "Paternity Leave",
+    }
+    return labels[type] || type
   }
   const [selectedLeaveType, setSelectedLeaveType] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -97,6 +107,8 @@ export default function EmployeeDashboard() {
   const [editEndDate, setEditEndDate] = useState<Date>()
   const [editReason, setEditReason] = useState("")
   const [isUpdating, setIsUpdating] = useState(false)
+  const [isStartDateOpen, setIsStartDateOpen] = useState(false)
+  const [isEndDateOpen, setIsEndDateOpen] = useState(false)
 
   const isLeaveRequestExpired = (request: any) => {
     const today = new Date()
@@ -109,7 +121,8 @@ export default function EmployeeDashboard() {
   const getStatusBadge = (request: any) => {
     if (isLeaveRequestExpired(request) || request.status === "expired") {
       return (
-        <Badge className="bg-gray-300 text-gray-700 text-xs hover:scale-110 transition-transform duration-300">
+        <Badge className="bg-gray-300 text-gray-700">
+          <Clock className="h-3 w-3 mr-1" />
           Expired
         </Badge>
       )
@@ -118,19 +131,22 @@ export default function EmployeeDashboard() {
     switch (request.status) {
       case "approved":
         return (
-          <Badge className="text-white text-xs hover:scale-110 transition-transform duration-300" style={{ backgroundColor: '#16A34A' }}>
+          <Badge className="bg-green-600 text-white">
+            <CheckCircle className="h-3 w-3 mr-1" />
             Approved
           </Badge>
         )
       case "rejected":
         return (
-          <Badge variant="destructive" className="text-xs hover:scale-110 transition-transform duration-300">
+          <Badge variant="destructive">
+            <XCircle className="h-3 w-3 mr-1" />
             Rejected
           </Badge>
         )
       default:
         return (
-          <Badge className="text-yellow-800 text-xs hover:scale-110 transition-transform duration-300" style={{ backgroundColor: '#FEF8D9' }}>
+          <Badge className="bg-yellow-100 text-yellow-800">
+            <Clock className="h-3 w-3 mr-1" />
             Pending
           </Badge>
         )
@@ -295,7 +311,10 @@ export default function EmployeeDashboard() {
   }
 
   const handleEdit = (request: any) => {
+    console.log('[EDIT] Attempting to edit request:', request)
+
     if (request.status !== "pending") {
+      console.log('[EDIT] Request is not pending, status:', request.status)
       addToast({
         title: "Cannot Edit",
         description: "Only pending requests can be edited",
@@ -305,6 +324,7 @@ export default function EmployeeDashboard() {
     }
 
     if (isLeaveRequestExpired(request)) {
+      console.log('[EDIT] Request is expired')
       addToast({
         title: "Cannot Edit",
         description: "Expired requests cannot be edited",
@@ -313,17 +333,52 @@ export default function EmployeeDashboard() {
       return
     }
 
+    console.log('[EDIT] Setting up edit dialog with data:', {
+      leaveType: request.leaveType || request.type,
+      startDate: request.startDate,
+      endDate: request.endDate,
+      reason: request.reason
+    })
+
     setEditingRequest(request)
     setEditLeaveType(request.leaveType || request.type)
-    setEditStartDate(parseISO(request.startDate))
-    setEditEndDate(parseISO(request.endDate))
+
+    try {
+      const startDate = parseISO(request.startDate)
+      const endDate = parseISO(request.endDate)
+      console.log('[EDIT] Parsed dates:', { startDate, endDate })
+      setEditStartDate(startDate)
+      setEditEndDate(endDate)
+    } catch (error) {
+      console.error('[EDIT] Error parsing dates:', error)
+      addToast({
+        title: "Error",
+        description: "Failed to parse request dates",
+        variant: "destructive",
+      })
+      return
+    }
+
     setEditReason(request.reason)
+    setIsStartDateOpen(false)
+    setIsEndDateOpen(false)
     setIsRequestDialogOpen(false)
+
+    console.log('[EDIT] Opening edit dialog')
     setIsEditDialogOpen(true)
   }
 
   const handleUpdateRequest = async () => {
+    console.log('[UPDATE] Starting update with data:', {
+      editLeaveType,
+      editStartDate,
+      editEndDate,
+      editReason,
+      editingRequest
+    })
+
     if (!editLeaveType || !editStartDate || !editEndDate || !editReason.trim()) {
+      console.log('[UPDATE] Validation failed - missing fields')
       addToast({
         title: "Validation Error",
         description: "Please fill in all fields",
@@ -333,6 +388,7 @@ export default function EmployeeDashboard() {
     }
 
     if (editStartDate > editEndDate) {
+      console.log('[UPDATE] Validation failed - end date before start date')
       addToast({
         title: "Validation Error",
         description: "End date must be after start date",
@@ -343,12 +399,16 @@ export default function EmployeeDashboard() {
 
     setIsUpdating(true)
     try {
-      await leaveAPI.updateRequest(editingRequest.id, {
+      const updateData = {
         leave_type: editLeaveType,
         start_date: format(editStartDate, "yyyy-MM-dd"),
         end_date: format(editEndDate, "yyyy-MM-dd"),
         reason: editReason.trim(),
-      })
+      }
+      console.log('[UPDATE] Sending update request:', updateData)
+
+      const result = await leaveAPI.updateRequest(editingRequest.id, updateData)
+      console.log('[UPDATE] Update successful:', result)
 
       addToast({
         title: "Success",
@@ -360,6 +420,7 @@ export default function EmployeeDashboard() {
       // Refresh data
       window.location.reload()
     } catch (error: any) {
+      console.error('[UPDATE] Update failed:', error)
       addToast({
         title: "Error",
         description: error.message || "Failed to update request",
@@ -1081,10 +1142,7 @@ export default function EmployeeDashboard() {
         </Dialog>
 
         {/* Request Details Dialog */}
-        <Dialog open={isRequestDialogOpen} onOpenChange={(open) => {
-          console.log('Request dialog state changing:', open)
-          setIsRequestDialogOpen(open)
-        }}>
+        <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}>
           <DialogContent className="max-w-xl">
             <DialogHeader className="pb-4 border-b">
               <div className="flex items-center gap-3">
@@ -1093,7 +1151,7 @@ export default function EmployeeDashboard() {
                 </div>
                 <div>
                   <DialogTitle className="text-lg font-bold text-slate-900 capitalize">
-                    {selectedRequest && `${getLeaveType(selectedRequest)} Leave`}
+                    {selectedRequest && getLeaveTypeLabel(getLeaveType(selectedRequest))}
                   </DialogTitle>
                   <DialogDescription className="text-xs text-slate-500">
                     Detailed information about your leave request
@@ -1101,7 +1159,6 @@ export default function EmployeeDashboard() {
                 </div>
               </div>
             </DialogHeader>
-
             {selectedRequest && (
               <div className="space-y-4 py-2">
                 {/* Status Badge */}
@@ -1179,10 +1236,13 @@ export default function EmployeeDashboard() {
               </div>
             )}
             {selectedRequest && selectedRequest.status === "pending" && !isLeaveRequestExpired(selectedRequest) && (
-              <div className="flex gap-2 pt-4 border-t">
+              <DialogFooter className="gap-2 pt-4 border-t">
                 <Button
                   variant="outline"
-                  onClick={() => handleEdit(selectedRequest)}
+                  onClick={() => {
+                    setIsRequestDialogOpen(false)
+                    handleEdit(selectedRequest)
+                  }}
                   className="flex-1 border-slate-300 text-slate-700 hover:bg-slate-100 hover:border-slate-400 hover:text-slate-900 transition-all duration-200"
                 >
                   <Edit className="h-4 w-4 mr-2" />
@@ -1207,24 +1267,33 @@ export default function EmployeeDashboard() {
                 >
                   Close
                 </Button>
-              </div>
+              </DialogFooter>
             )}
             {selectedRequest && (selectedRequest.status !== "pending" || isLeaveRequestExpired(selectedRequest)) && (
-              <div className="pt-4 border-t">
+              <DialogFooter className="pt-4 border-t">
                 <Button
                   onClick={() => setIsRequestDialogOpen(false)}
                   className="w-full bg-emerald-600 hover:bg-emerald-700 transition-all duration-200"
                 >
                   Close
                 </Button>
-              </div>
+              </DialogFooter>
             )}
           </DialogContent>
         </Dialog>
 
         {/* Edit Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent
+            className="max-w-2xl"
+            onInteractOutside={(e) => {
+              // Prevent dialog from closing when clicking on calendar popover
+              const target = e.target as HTMLElement
+              if (target.closest('[role="dialog"]') || target.closest('.rdp')) {
+                e.preventDefault()
+              }
+            }}
+          >
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold text-slate-900">Edit Leave Request</DialogTitle>
               <DialogDescription className="text-sm text-slate-600">
@@ -1234,47 +1303,51 @@ export default function EmployeeDashboard() {
             <div className="space-y-6">
               {/* Leave Type */}
               <div className="space-y-2">
-                <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                <Label className="text-sm font-medium text-gray-600">
                   Leave Type <span className="text-red-500">*</span>
                 </Label>
                 <Select value={editLeaveType} onValueChange={setEditLeaveType}>
-                  <SelectTrigger className="h-11 bg-slate-50 border-slate-200 hover:border-emerald-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-lg transition-colors">
+                  <SelectTrigger className="h-11 bg-gray-50 border-gray-300 hover:border-emerald-500 focus:border-emerald-500 focus:ring-0 focus:ring-offset-0 transition-colors">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="annual">Annual Leave</SelectItem>
-                    <SelectItem value="sick">Sick Leave</SelectItem>
-                    <SelectItem value="personal">Personal Leave</SelectItem>
-                    <SelectItem value="emergency">Emergency Leave</SelectItem>
-                    <SelectItem value="maternity">Maternity Leave</SelectItem>
+                    <SelectItem value="annual" className="hover:bg-emerald-50 focus:bg-emerald-50">Annual Leave</SelectItem>
+                    <SelectItem value="sick" className="hover:bg-emerald-50 focus:bg-emerald-50">Sick Leave</SelectItem>
+                    <SelectItem value="personal" className="hover:bg-emerald-50 focus:bg-emerald-50">Personal Leave</SelectItem>
+                    <SelectItem value="emergency" className="hover:bg-emerald-50 focus:bg-emerald-50">Emergency Leave</SelectItem>
+                    <SelectItem value="maternity" className="hover:bg-emerald-50 focus:bg-emerald-50">Maternity Leave</SelectItem>
+                    <SelectItem value="paternity" className="hover:bg-emerald-50 focus:bg-emerald-50">Paternity Leave</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {/* Dates */}
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                  <Label className="text-sm font-medium text-gray-600">
                     Start Date <span className="text-red-500">*</span>
                   </Label>
-                  <Popover>
+                  <Popover open={isStartDateOpen} onOpenChange={setIsStartDateOpen} modal={true}>
                     <PopoverTrigger asChild>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         className={cn(
-                          "w-full justify-start text-left font-normal bg-slate-50 border-slate-200 h-11 hover:border-emerald-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-lg transition-colors",
-                          !editStartDate && "text-slate-400"
+                          "w-full justify-start text-left font-normal bg-white border-gray-300 h-11 hover:border-emerald-500 hover:bg-gray-50 hover:text-gray-900 focus:border-emerald-500 focus:ring-0 focus:ring-offset-0 data-[state=open]:bg-white data-[state=open]:border-emerald-500 transition-colors",
+                          !editStartDate && "text-gray-400"
                         )}
                       >
-                        <Calendar className="mr-2 h-4 w-4 text-slate-500" />
+                        <Calendar className="mr-2 h-4 w-4 text-gray-500" />
                         {editStartDate ? format(editStartDate, "PPP") : "Pick a date"}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
+                    <PopoverContent className="w-auto p-0 bg-white" align="start" side="bottom" sideOffset={4}>
                       <CalendarComponent
                         mode="single"
                         selected={editStartDate}
-                        onSelect={setEditStartDate}
+                        onSelect={(date) => {
+                          setEditStartDate(date)
+                          setIsStartDateOpen(false)
+                        }}
                         disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                       />
                     </PopoverContent>
@@ -1282,27 +1355,30 @@ export default function EmployeeDashboard() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                  <Label className="text-sm font-medium text-gray-600">
                     End Date <span className="text-red-500">*</span>
                   </Label>
-                  <Popover>
+                  <Popover open={isEndDateOpen} onOpenChange={setIsEndDateOpen} modal={true}>
                     <PopoverTrigger asChild>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         className={cn(
-                          "w-full justify-start text-left font-normal bg-slate-50 border-slate-200 h-11 hover:border-emerald-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-lg transition-colors",
-                          !editEndDate && "text-slate-400"
+                          "w-full justify-start text-left font-normal bg-white border-gray-300 h-11 hover:border-emerald-500 hover:bg-gray-50 hover:text-gray-900 focus:border-emerald-500 focus:ring-0 focus:ring-offset-0 data-[state=open]:bg-white data-[state=open]:border-emerald-500 transition-colors",
+                          !editEndDate && "text-gray-400"
                         )}
                       >
-                        <Calendar className="mr-2 h-4 w-4 text-slate-500" />
+                        <Calendar className="mr-2 h-4 w-4 text-gray-500" />
                         {editEndDate ? format(editEndDate, "PPP") : "Pick a date"}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
+                    <PopoverContent className="w-auto p-0 bg-white" align="start" side="bottom" sideOffset={4}>
                       <CalendarComponent
                         mode="single"
                         selected={editEndDate}
-                        onSelect={setEditEndDate}
+                        onSelect={(date) => {
+                          setEditEndDate(date)
+                          setIsEndDateOpen(false)
+                        }}
                         disabled={(date) =>
                           date < new Date(new Date().setHours(0, 0, 0, 0)) ||
                           (editStartDate ? date < editStartDate : false)
@@ -1315,7 +1391,7 @@ export default function EmployeeDashboard() {
 
               {/* Reason */}
               <div className="space-y-2">
-                <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                <Label className="text-sm font-medium text-gray-600">
                   Reason <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
@@ -1323,22 +1399,22 @@ export default function EmployeeDashboard() {
                   onChange={(e) => setEditReason(e.target.value)}
                   rows={5}
                   placeholder="Provide a reason for your leave..."
-                  className="resize-none bg-slate-50 border-slate-200 hover:border-emerald-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-lg transition-colors"
+                  className="resize-none bg-gray-50 border-gray-300 hover:border-emerald-500 focus:border-emerald-500 focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none transition-colors"
                 />
               </div>
             </div>
-            <DialogFooter className="gap-2 pt-6 border-t-0">
-              <Button 
-                variant="outline" 
-                onClick={() => setIsEditDialogOpen(false)} 
-                className="border-slate-300 text-slate-700 hover:bg-slate-100 hover:border-slate-400 hover:text-slate-900 transition-all duration-200"
+            <DialogFooter className="gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setIsEditDialogOpen(false)}
+                className="border-gray-300 text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-500 transition-colors"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleUpdateRequest}
                 disabled={isUpdating}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white transition-all duration-200"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
               >
                 {isUpdating ? "Updating..." : "Update Request"}
               </Button>
