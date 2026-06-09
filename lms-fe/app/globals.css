@@ -1,0 +1,389 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Updated color tokens to match professional leave management design */
+  --background: 0 0% 100%;
+  --foreground: 217 19% 27%;
+  --card: 138 76% 97%;
+  --card-foreground: 217 19% 27%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 217 19% 27%;
+  --primary: 160 84% 39%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 158 64% 52%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 138 76% 97%;
+  --muted-foreground: 217 19% 27%;
+  --accent: 160 84% 39%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 13% 91%;
+  --input: 210 17% 98%;
+  --ring: 158 64% 52%;
+  --chart-1: 140 81% 31%;
+  --chart-2: 0 84% 60%;
+  --chart-3: 188 94% 37%;
+  --chart-4: 38 92% 50%;
+  --chart-5: 138 76% 97%;
+  --radius: 0.375rem;
+  --sidebar: 138 76% 97%;
+  --sidebar-foreground: 217 19% 27%;
+  --sidebar-primary: 140 81% 31%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 76 73% 48%;
+  --sidebar-accent-foreground: 217 19% 27%;
+  --sidebar-border: 220 13% 91%;
+  --sidebar-ring: 76 73% 48%;
+}
+
+.dark {
+  --background: 222 47% 11%;
+  --foreground: 210 40% 96%;
+  --card: 217 33% 17%;
+  --card-foreground: 210 40% 96%;
+  --popover: 217 33% 17%;
+  --popover-foreground: 210 40% 96%;
+  --primary: 142 71% 45%;
+  --primary-foreground: 222 47% 11%;
+  --secondary: 84 81% 56%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 84 81% 56%;
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 40% 96%;
+  --border: 215 28% 27%;
+  --input: 217 33% 17%;
+  --ring: 84 81% 56%;
+  --chart-1: 142 71% 45%;
+  --chart-2: 0 84% 60%;
+  --chart-3: 189 94% 43%;
+  --chart-4: 38 92% 50%;
+  --chart-5: 217 33% 17%;
+  --sidebar: 217 33% 17%;
+  --sidebar-foreground: 210 40% 96%;
+  --sidebar-primary: 142 71% 45%;
+  --sidebar-primary-foreground: 222 47% 11%;
+  --sidebar-accent: 84 81% 56%;
+  --sidebar-accent-foreground: 222 47% 11%;
+  --sidebar-border: 215 28% 27%;
+  --sidebar-ring: 84 81% 56%;
+}
+
+
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Ensure text selection is enabled and visible */
+  input,
+  textarea,
+  [contenteditable] {
+    user-select: text;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+  }
+
+  /* Fix invisible text selection */
+  input::selection,
+  textarea::selection {
+    background-color: #3b82f6 !important;
+    color: #ffffff !important;
+  }
+
+  input::-moz-selection,
+  textarea::-moz-selection {
+    background-color: #3b82f6 !important;
+    color: #ffffff !important;
+  }
+}
+
+@layer utilities {
+  @keyframes shake {
+
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+
+    10%,
+    30%,
+    50%,
+    70%,
+    90% {
+      transform: translateX(-2px);
+    }
+
+    20%,
+    40%,
+    60%,
+    80% {
+      transform: translateX(2px);
+    }
+  }
+
+  @keyframes float {
+
+    0%,
+    100% {
+      transform: translateY(0px);
+    }
+
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  @keyframes glow {
+
+    0%,
+    100% {
+      box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+    }
+
+    50% {
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.8), 0 0 30px rgba(59, 130, 246, 0.6);
+    }
+  }
+
+  @keyframes slideInUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-30px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(30px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes fadeInScale {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes progressFill {
+    from {
+      width: 0%;
+    }
+
+    to {
+      width: var(--progress-width);
+    }
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  .animate-shake {
+    animation: shake 0.5s ease-in-out;
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite;
+  }
+
+  .animate-slide-in-up {
+    animation: slideInUp 0.6s ease-out;
+  }
+
+  .animate-slide-in-left {
+    animation: slideInLeft 0.6s ease-out;
+  }
+
+  .animate-slide-in-right {
+    animation: slideInRight 0.6s ease-out;
+  }
+
+  .animate-fade-in-scale {
+    animation: fadeInScale 0.6s ease-out;
+  }
+
+  .animate-progress-fill {
+    animation: progressFill 1.5s ease-out;
+  }
+
+  .animate-shimmer {
+    animation: shimmer 2s ease-in-out infinite;
+  }
+
+  /* Staggered animation delays */
+  .animate-delay-100 {
+    animation-delay: 100ms;
+  }
+
+  .animate-delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .animate-delay-300 {
+    animation-delay: 300ms;
+  }
+
+  .animate-delay-400 {
+    animation-delay: 400ms;
+  }
+
+  .animate-delay-500 {
+    animation-delay: 500ms;
+  }
+
+  .animate-delay-600 {
+    animation-delay: 600ms;
+  }
+
+  .animate-delay-700 {
+    animation-delay: 700ms;
+  }
+
+  .animate-delay-800 {
+    animation-delay: 800ms;
+  }
+
+  .animate-delay-900 {
+    animation-delay: 900ms;
+  }
+
+  .animate-delay-1000 {
+    animation-delay: 1000ms;
+  }
+
+  /* Custom scrollbar styles for calendar */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
+
+  /* Firefox scrollbar */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
+  }
+
+  /* Minimal clean calendar scrollbar - no arrows, just thin track */
+  .calendar-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(16, 185, 129, 0.3) transparent;
+  }
+
+  .calendar-scrollbar::-webkit-scrollbar {
+    width: 3px;
+  }
+
+  .calendar-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .calendar-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(16, 185, 129, 0.3);
+    border-radius: 10px;
+  }
+
+  .calendar-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(16, 185, 129, 0.5);
+  }
+
+  /* Completely remove all scrollbar arrow buttons */
+  .calendar-scrollbar::-webkit-scrollbar-button {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+
+  /* Additional override to ensure no scrollbar arrows appear anywhere */
+  .calendar-scrollbar::-webkit-scrollbar-button:vertical:start:increment,
+  .calendar-scrollbar::-webkit-scrollbar-button:vertical:end:decrement,
+  .calendar-scrollbar::-webkit-scrollbar-button:horizontal:start:increment,
+  .calendar-scrollbar::-webkit-scrollbar-button:horizontal:end:decrement {
+    display: none !important;
+    height: 0 !important;
+    width: 0 !important;
+  }
+
+  /* Force hide any arrow-like elements */
+  .calendar-scrollbar::before,
+  .calendar-scrollbar::after {
+    display: none !important;
+    content: none !important;
+  }
+
+  /* Completely hide scrollbar option */
+  .calendar-scrollbar-hidden,
+  .custom-scrollbar-hidden {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .calendar-scrollbar-hidden::-webkit-scrollbar,
+  .custom-scrollbar-hidden::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+}

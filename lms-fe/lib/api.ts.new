@@ -1,0 +1,122 @@
+export interface Employee {
+  id: string
+  name: string
+  email: string
+  role: string
+  department: string
+  employee_id: string
+  annual_leave: number
+  sick_leave: number
+  personal_leave: number
+  emergency_leave: number
+  maternity_leave: number
+}
+
+export interface LeaveRequest {
+  id: string
+  userId: string
+  leaveType: string
+  startDate: string
+  endDate: string
+  reason: string
+  status: string
+  comment?: string
+  appliedAt: string
+}
+
+export interface LeaveRequestWithUser {
+  id: string
+  userId: {
+    id: string
+    name: string
+    email: string
+    role: string
+    department: string
+    employee_id: string
+    annual_leave: number
+    sick_leave: number
+    personal_leave: number
+    emergency_leave: number
+    maternity_leave: number
+  }
+  leaveType: string
+  startDate: string
+  endDate: string
+  reason: string
+  status: string
+  comment?: string
+  appliedAt: string
+}
+
+export const authAPI = {
+  login: async (email: string, password: string) => {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    })
+    if (!res.ok) throw new Error("Login failed")
+    return res.json()
+  },
+  register: (_data: any) => Promise.reject(new Error("Registration is not available in demo mode")),
+  me: () => Promise.reject(new Error("Not implemented in demo mode")),
+}
+
+export const leaveAPI = {
+  getMyRequests: async () => {
+    const user = JSON.parse(localStorage.getItem("user") || "{}")
+    const res = await fetch("/api/leave")
+    if (!res.ok) throw new Error("Failed to fetch")
+    const all = await res.json()
+    return all.filter((r: LeaveRequestWithUser) => r.userId.id === user.id)
+  },
+  getAllRequests: async () => {
+    const res = await fetch("/api/leave")
+    if (!res.ok) throw new Error("Failed to fetch")
+    return res.json()
+  },
+  submitRequest: async (data: any) => {
+    const user = JSON.parse(localStorage.getItem("user") || "{}")
+    const res = await fetch("/api/leave", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...data, userId: user.id }),
+    })
+    if (!res.ok) throw new Error("Failed to submit")
+    return res.json()
+  },
+  updateRequestStatus: async (requestId: string, status: "approved" | "rejected", comment?: string) => {
+    const res = await fetch(`/api/leave/${requestId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status, comment }),
+    })
+    if (!res.ok) throw new Error("Failed to update")
+    return res.json()
+  },
+  updateRequest: async (requestId: string, data: { leaveType: string; startDate: string; endDate: string; reason: string }) => {
+    const res = await fetch(`/api/leave/${requestId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) throw new Error("Failed to update request")
+    return res.json()
+  },
+  deleteRequest: async (requestId: string) => {
+    const res = await fetch(`/api/leave/${requestId}`, {
+      method: "DELETE",
+    })
+    if (!res.ok) throw new Error("Failed to delete request")
+    return res.json()
+  },
+}
+
+export const adminAPI = {
+  getEmployees: async () => {
+    const res = await fetch("/api/users")
+    if (!res.ok) throw new Error("Failed to fetch users")
+    const users = await res.json()
+    return users
+  },
+}
