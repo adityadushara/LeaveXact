@@ -7,8 +7,12 @@ from app.database import engine, Base
 from app.routes import auth_routes, employee_routes, leave_routes, admin_routes, log_routes, analytics_routes, holiday_routes
 import logging
 
-# Create database tables if they don't exist (but don't populate data)
+# Create database tables and seed default data if empty
 Base.metadata.create_all(bind=engine)
+
+# Initialize default users (admin + employees) if they don't exist
+from app.init_db import init_database
+init_database()
 
 app = FastAPI(
     title="LeaveXact API",
