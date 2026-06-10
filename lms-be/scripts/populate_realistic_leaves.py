@@ -134,14 +134,14 @@ def populate_leaves(leaves_per_employee: int = 7):
     
     try:
         # Get all employees (non-admin users)
-        employees = db.query(User).filter(User.role == "EMPLOYEE").all()
+        employees = db.query(User).filter(User.role == "employee").all()
         
         if not employees:
             print("No employees found in database!")
             return
         
         # Get admin user for approval actions
-        admin = db.query(User).filter(User.role == "ADMIN").first()
+        admin = db.query(User).filter(User.role == "admin").first()
         if not admin:
             print("Warning: No admin user found. Creating audit logs without admin.")
         

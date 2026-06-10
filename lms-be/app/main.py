@@ -14,6 +14,30 @@ Base.metadata.create_all(bind=engine)
 from app.init_db import init_database
 init_database()
 
+# Populate sample leave data if no leave requests exist
+def _seed_leaves():
+    from app.database import SessionLocal
+    from app.models import LeaveRequest
+    db = SessionLocal()
+    try:
+        if db.query(LeaveRequest).count() == 0:
+            db.close()
+            import sys
+            from pathlib import Path
+            # Add the project root so scripts module is importable
+            project_root = str(Path(__file__).parent.parent)
+            if project_root not in sys.path:
+                sys.path.insert(0, project_root)
+            from scripts.populate_realistic_leaves import populate_leaves
+            populate_leaves(leaves_per_employee=5)
+        else:
+            db.close()
+    except Exception as e:
+        db.close()
+        logging.warning(f"Could not seed leave data: {e}")
+
+_seed_leaves()
+
 app = FastAPI(
     title="LeaveXact API",
     description="A comprehensive leave management system API",
