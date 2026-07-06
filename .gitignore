@@ -73,3 +73,6 @@ next-env.d.ts
 *.tmp
 *.temp
 .cache/
+audit-screenshots/
+videos/
+
